@@ -1,8 +1,9 @@
-# rsync -Pr /Users/eczech/repos/misc/wakipy/* pi@rb1:/home/pi/repos/wakipy/src/wakipy/
+# rsync -Pr /Users/eczech/repos/misc/wakipy/* pi@rb1:/home/pi/repos/wakipy/
 from flask import Flask
 from flask import request
 from flask import jsonify
 import argparse
+import traceback
 import lights
 import schedule
 import threading
@@ -41,14 +42,22 @@ def run_threaded(fn):
 
 def run_alarm_music():
     logger.info("Running alarm music")
-    music.play_all()
-    return schedule.CancelJob
+    try:
+        music.play_all()
+    except:
+        traceback.print_exc()
+    finally:
+        return schedule.CancelJob
 
 
 def run_alarm_lights():
     logger.info("Running alarm lights")
-    lights.run()
-    return schedule.CancelJob
+    try:
+        lights.run()
+    except:
+        traceback.print_exc()
+    finally:
+        return schedule.CancelJob
 
 
 @app.route("/get_songs")
@@ -113,7 +122,14 @@ def set_alarm():
     # Schedule the alarm components
     schedule.every(1).day.at(time).do(run_alarm_music).tag('alarm')
     schedule.every(1).day.at(time).do(run_alarm_lights).tag('alarm')
-    return u'Alarm set for time {} \U0001F634 -- sleep well me goob!'.format(time)
+    return u'Alarm set for time {} \U0001F634 -- sleep well my goob!'.format(time)
+
+
+@app.route("/trigger_alarm")
+def trigger_alarm():
+    run_threaded(run_alarm_music)
+    run_threaded(run_alarm_lights)
+    return u'Alarm triggered'
 
 
 @app.route("/stop_alarm")
