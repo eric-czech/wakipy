@@ -16,22 +16,23 @@ def stop():
     STOP = True
 
 
-def play_song(observer, path):
+def play_song(observer, path, idx, ct):
     global STOP
     STOP = False
     player = vlc.MediaPlayer(path)
-    ct = 0
-    observer('before', player, ct)
+    observer('before', player, idx, ct)
     player.play()
     while (player.get_state() not in [vlc.State.Ended, vlc.State.Error]) and not STOP:
         logger.info("Waiting for song to stop...")
+        logger.info("Current music player state: %s", player.get_state())
         ct += 1
         time.sleep(10)
         logger.info("Current volume = %s", player.audio_get_volume())
-        observer('during', player, ct)
+        observer('during', player, idx, ct)
     player.stop()
-    observer('after', player, ct)
+    observer('after', player, idx, ct)
     logger.info("Song playback complete")
+    return ct
 
 
 def play_all():
@@ -44,16 +45,17 @@ def play_all():
 
     logging.info("Found order of songs: {}".format([s[1]['title'] for s in manifest]))
 
-    def observer(event, player, ct):
-        if event == 'before':
+    def observer(event, player, _, ct):
+        if ct == 0 and event == 'before':
             player.audio_set_volume(10)
         if event == 'during':
             if ct % 4 == 0:
                 player.audio_set_volume(min(player.audio_get_volume() + 5, 50))
 
-    for k, v in manifest:
+    ct = 0
+    for i, (k, v) in enumerate(manifest):
         logger.info("Playing song '%s' (%s)", v['title'], k)
-        play_song(observer, v['path'])
+        ct = play_song(observer, v['path'], i, ct)
         if STOP:
             break
     logger.info("Music playback complete")
@@ -94,12 +96,16 @@ def prioritize(id):
 
 def download(id):
     url = 'https://www.youtube.com/watch?v={id}'.format(id=id)
-    path = osp.join(config.cfg.music_data_dir, id + '.mp3')
+    # It seems it's actually necessary to use the string format fields and not
+    # hard-code the template for the path (this was also seen in
+    # https://stackoverflow.com/questions/47685506/pygame-playing-mp3-files-downloaded-by-youtube-dl-is-not-working)
+    path = osp.join(config.cfg.music_data_dir, '%(id)s.%(ext)s')
     if not osp.exists(osp.dirname(path)):
         os.makedirs(osp.dirname(path))
     ydl_opts = {
         'format': 'bestaudio/best',
-        'outtmpl': path,
+        # Convert to avoid: WARNING: Parameter outtmpl is bytes, but should be a unicode string.
+        'outtmpl': unicode(path, 'utf-8'),
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -114,7 +120,7 @@ def download(id):
             'title': info.get('title', None),
             'url': info.get("url", None),
             'type': 'yt',
-            'path': path,
+            'path': osp.join(config.cfg.music_data_dir, id + '.mp3'),
             'ts': _ts()
         }
         manifest[id] = video
