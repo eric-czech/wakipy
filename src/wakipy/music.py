@@ -67,12 +67,20 @@ def get_manifest():
     if not osp.exists(path):
         return manifest
     with open(path, 'r') as fd:
-        return json.load(fd)
+        for l in fd.readlines():
+            if l:
+                obj = json.loads(l)
+                manifest[obj['_id']] = obj
+    return manifest
+
 
 def save_manifest(manifest):
     path = config.cfg.manifest_path
     with open(path, 'w') as fd:
-        return json.dump(manifest, fd)
+        for vid in sorted(manifest.keys()):
+            obj = manifest[vid]
+            obj['_id'] = vid
+            fd.write(json.dumps(obj) + '\n')
     return path
 
 def _ts():
@@ -86,6 +94,7 @@ def rename(id, name):
     save_manifest(manifest)
     return manifest
 
+
 def prioritize(id):
     manifest = get_manifest()
     if id not in manifest:
@@ -93,6 +102,7 @@ def prioritize(id):
     manifest[id]['ts'] = _ts()
     save_manifest(manifest)
     return manifest
+
 
 def download(id):
     url = 'https://www.youtube.com/watch?v={id}'.format(id=id)

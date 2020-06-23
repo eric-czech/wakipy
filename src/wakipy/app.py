@@ -41,9 +41,14 @@ def run_threaded(fn):
 
 
 def run_alarm_music():
+    run_threaded(_run_alarm_music)
+
+
+def _run_alarm_music():
     logger.info("Running alarm music")
     try:
         music.play_all()
+        pass
     except:
         traceback.print_exc()
     finally:
@@ -51,6 +56,10 @@ def run_alarm_music():
 
 
 def run_alarm_lights():
+    run_threaded(_run_alarm_lights)
+
+
+def _run_alarm_lights():
     logger.info("Running alarm lights")
     try:
         lights.run()
@@ -127,8 +136,8 @@ def set_alarm():
 
 @app.route("/trigger_alarm")
 def trigger_alarm():
-    run_threaded(run_alarm_music)
-    run_threaded(run_alarm_lights)
+    run_alarm_music()
+    run_alarm_lights()
     return u'Alarm triggered'
 
 
